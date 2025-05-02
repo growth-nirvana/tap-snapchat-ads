@@ -32,13 +32,6 @@ ALL_STATS_FIELDS = 'android_installs,attachment_avg_view_time_millis,attachment_
 LOGGER = singer.get_logger()
 BASE_URL = 'https://adsapi.snapchat.com/v1'
 
-@staticmethod
-def _decamelize_keys(record):
-    def decamelize(s):
-        s = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
-        return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s).lower()
-    return {decamelize(k): v for k, v in record.items()}
-
 # Currently syncing sets the stream currently being delivered in the state.
 # If the integration is interrupted, this state property is used to identify
 #  the starting point to continue from.
@@ -83,6 +76,13 @@ class SnapchatAds:
     targeting_group = None
     targeting_type = None
     children = []
+
+    @staticmethod
+    def _decamelize_keys(record):
+        def decamelize(s):
+            s = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
+            return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s).lower()
+        return {decamelize(k): v for k, v in record.items()}
 
     # To write schema in output
     def write_schema(self, catalog, stream_name, sync_streams , selected_streams):
@@ -251,12 +251,17 @@ class SnapchatAds:
         ids = []
         url = BASE_URL + '/{stream_name}/{id}'
         for profile in selected_profiles:
-            if stream_name == 'organizations':
-                ids.append(profile.get('organisation_id'))
+            if isinstance(profile, dict):
+                if stream_name == 'organizations':
+                    ids.append(profile.get('organisation_id'))
+                else:
+                    if parent_id == profile.get('organisation_id'):
+                        ids = profile.get('ad_accounts', [])
+                        break
             else:
-                if parent_id == profile.get('organisation_id'):
-                    ids = profile.get('ad_accounts')
-                    break
+                # Assume profile is a simple org ID string
+                if stream_name == 'organizations':
+                    ids.append(profile)
         # WARN Logger to confirm if User has selected Ad accounts or if Ad accounts doesn't exist for org_id
         if not ids and stream_name == 'adaccounts':
             LOGGER.warn("No AD Accounts selected or exist for organisation id {}".format(parent_id))
