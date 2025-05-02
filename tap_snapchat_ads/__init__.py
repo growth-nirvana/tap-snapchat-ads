@@ -28,12 +28,18 @@ def do_discover():
     LOGGER.info('Finished discover')
 
 def maybe_parse_org_account_ids(config):
-    """Converts org_account_ids into a list if it is a JSON-encoded string."""
-    if isinstance(config["org_account_ids"], str):
+    """Parses org_account_ids from a JSON string or a comma-separated string."""
+    value = config.get("org_account_ids")
+    if isinstance(value, str):
         try:
-            config.update(org_account_ids = json.loads(config["org_account_ids"]))
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Error parsing org_account_ids string: {e}") from e
+            # Try JSON parsing first
+            parsed = json.loads(value)
+            if not isinstance(parsed, list):
+                raise ValueError("Parsed JSON is not a list.")
+            config["org_account_ids"] = parsed
+        except json.JSONDecodeError:
+            # Fallback: treat as comma-separated string
+            config["org_account_ids"] = [v.strip() for v in value.split(",") if v.strip()]
 
 @singer.utils.handle_top_exception(LOGGER)
 def main():

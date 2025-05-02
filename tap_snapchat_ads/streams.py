@@ -19,7 +19,7 @@
 # pylint: disable=line-too-long
 import pytz
 import math
-import humps
+import re
 from datetime import timedelta
 from dateutil import tz
 from urllib.parse import urlencode
@@ -31,6 +31,13 @@ ALL_STATS_FIELDS = 'android_installs,attachment_avg_view_time_millis,attachment_
 
 LOGGER = singer.get_logger()
 BASE_URL = 'https://adsapi.snapchat.com/v1'
+
+@staticmethod
+def _decamelize_keys(record):
+    def decamelize(s):
+        s = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
+        return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s).lower()
+    return {decamelize(k): v for k, v in record.items()}
 
 # Currently syncing sets the stream currently being delivered in the state.
 # If the integration is interrupted, this state property is used to identify
@@ -486,7 +493,7 @@ class SnapchatAds:
 
                                 # transform record
                                 try:
-                                    transformed_record = humps.decamelize(record)
+                                    transformed_record = self._decamelize_keys(record)
                                 except Exception as err:
                                     LOGGER.error('{}'.format(err))
                                     raise
@@ -535,7 +542,7 @@ class SnapchatAds:
 
                             # transform record (remove inconsistent use of CamelCase)
                             try:
-                                transformed_record = humps.decamelize(record)
+                                transformed_record = self._decamelize_keys(record)
                             except Exception as err:
                                 LOGGER.error('{}'.format(err))
                                 LOGGER.error('error record: {}'.format(record))
